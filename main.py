@@ -1,16 +1,33 @@
-# This is a sample Python script.
+import asyncio
+from dotenv import load_dotenv
+from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
+from livekit.agents.voice_assistant import VoiceAssistant
+from livekit.plugins import openai, silero
 
-# Press Ctrl+F5 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+load_dotenv()
 
+async def entrypoint(ctx: JobContext):
+    initial_ctx = llm.ChatContext().append(
+        role="system",
+        text=(
+            "You are a voice assistant created by LiveKit. Your name is Zaneri. Your interface with users will be voice. "
+            "You should use short and concise responses, and avoiding usage of unpronounceable punctuation."
+        ),
+    )
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press F9 to toggle the breakpoint.
+    assistant = VoiceAssistant(
+        vad=silero.VAD.load(),
+        stt=openai.STT(),
+        llm=openai.LLM(),
+        tts=openai.TTS(),
+        chat_ctx=initial_ctx
+    )
 
+    assistant.start(ctx.room)
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+    await asyncio.sleep(1)
+    await assistant.say("Hello, my name is Zaneri, what can i do for you?", allow_interruptions=True)
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+if __name__ == "__main__":
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
